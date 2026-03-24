@@ -22,7 +22,7 @@ app=FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], # Need to be changed in future
-    allow_creedentials=True,
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -55,7 +55,7 @@ class UserDB(Base):
     employs=relationship("EmployDB", back_populates="owner") # establishing relationship with EmployDB
 
 class EmployDB(Base):
-    __tablename__ = "employees"
+    __tablename__ = "employs"
 
     id = Column(Integer, primary_key=True, index=True)
     name=Column(String)
@@ -75,8 +75,9 @@ class UserCreate(BaseModel):
     id: int
     fullname:str
     email: str
+    password: str
 
-    class config:
+    class Config:
         orm_mode = True
 
 class UserResponse(BaseModel):
@@ -84,7 +85,7 @@ class UserResponse(BaseModel):
     fullname:str
     email: str
 
-    class config:
+    class Config:
         orm_mode = True
 
 class EmployCreate(BaseModel):
@@ -139,7 +140,7 @@ def create_access_token(data:dict):
 def get_current_user(token:str=Depends(oauth2_scheme), db: Session=Depends(get_db)):
     try:
         payload=jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email=payload.get("sub")
+        email=payload.get("email")
         if email is None:
             raise HTTPException(
                 status_code=401,
@@ -260,28 +261,24 @@ def get_employ(
 # update employe
 @app.put(API_V1 + "/employs/{id}")
 def update_employ(
-    id: int,
-    employ: EmployCreate,
-    current_user: UserDB=Depends(get_current_user), 
-    db: Session=Depends(get_db)
+    id:int,
+    data:EmployCreate,
+    db: Session = Depends(get_db),
+    current_user:UserDB = Depends(get_current_user)
     ):
-    employ=db.query(EmployDB).filter(EmployDB.id==id).first()
+    employ=db.query(EmployDB).filter(EmployDB.id == id).first()
     if not employ:
-        raise HTTPException(
-            status_code=404,
-            detail="Employee not found",
-        )
-    employ.name=employ.fullname
-    employ.email=employ.email
-    employ.isOnProject=employ.isOnProject
-    employ.experience=employ.experience
-    employ.completed=employ.completed
-    employ.description=employ.description
-
+        raise HTTPException(status_code=404,detail="Employee not found")
+    
+    employ.fullname=data.fullname
+    employ.email=data.email
+    employ.isOnProject=data.isOnProject
+    employ.experience=data.experience
+    employ.completed=data.completed
+    employ.description=data.description
+    
     db.commit()
-    return {
-        "message": "Employee updated successfully"
-        }
+    return { "message":"employee updated successfully"}
 
 # delete employee
 @app.delete(API_V1 + "/employs/{id}")
